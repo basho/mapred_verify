@@ -15,6 +15,19 @@ map(missing, [_], 0) ->
     %% the purpose of excersizing the "include_notfound" argument
     io:format("Warning: 1 Map Result?"),
     true;
+map(missing, Result, TotalEntries) ->
+    io:format("Got ~p notfounds, Expecting: ~p...", [length(Result), TotalEntries]),
+    NotFoundMatch = fun(X) ->
+                            case X of
+                                {error, _} -> % matches erlang notfound pattern
+                                    true;
+                                {not_found, _, _} -> % matches javascript notfound pattern
+                                    true;
+                                _ ->
+                                    false
+                            end
+                    end,
+    length(Result) == TotalEntries andalso lists:all(NotFoundMatch, Result);
 map(_Type, Result, TotalEntries) ->
     io:format("Got ~p, Expecting: ~p...", [length(Result), TotalEntries]),
     length(Result) == TotalEntries.
