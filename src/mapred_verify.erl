@@ -122,7 +122,7 @@ verify_job(Client, Bucket, KeyCount, Label, JobDesc, Verifier) ->
 verify_missing_job(Client, _Bucket, _KeyCount, JobDesc, Verifier) ->
     Inputs = [{<<"mrv_missing">>, <<"mrv_missing">>}],
     Start = erlang:now(),
-    {_, Node, _} = Client,
+    {_, [Node, _]} = Client,
     {ok, Result} = rpc:call(Node, riak_kv_mrc_pipe, mapred, [Inputs, JobDesc]),
     End = erlang:now(),
     {mapred_verifiers:Verifier(missing, Result, 1),
@@ -132,7 +132,7 @@ verify_missing_twice_job(Client, _Bucket, _KeyCount, JobDesc, Verifier) ->
     Inputs = [{<<"mrv_missing">>, <<"mrv_missing">>},
               {<<"mrv_missing">>, <<"mrv_missing">>}],
     Start = erlang:now(),
-    {_, Node, _} = Client,
+    {_, [Node, _]} = Client,
     {ok, Result} = rpc:call(Node, riak_kv_mrc_pipe, mapred, [Inputs, JobDesc]),
     End = erlang:now(),
     {mapred_verifiers:Verifier(missing, Result, 2),
@@ -144,7 +144,7 @@ verify_filter_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
                [[<<"ends_with">>,<<"5">>]]
               ]],
     Start = erlang:now(),
-    {_, Node, _} = Client,
+    {_, [Node, _]} = Client,
     {ok, Result} = rpc:call(Node, riak_kv_mrc_pipe, mapred,
                             [{Bucket,Filter}, JobDesc]),
     End = erlang:now(),
@@ -154,7 +154,7 @@ verify_filter_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
 
 verify_bucket_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     Start = erlang:now(),
-    {_, Node, _} = Client,
+    {_, [Node, _]} = Client,
     {ok, Result} = rpc:call(Node, riak_kv_mrc_pipe, mapred,
                             [Bucket, JobDesc, 600000]),
     End = erlang:now(),
@@ -164,7 +164,7 @@ verify_bucket_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
 verify_entries_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     Inputs = select_inputs(Bucket, KeyCount),
     Start = erlang:now(),
-    {_, Node, _} = Client,
+    {_, [Node, _]} = Client,
     {ok, Result} = rpc:call(Node, riak_kv_mrc_pipe, mapred, [Inputs, JobDesc]),
     End = erlang:now(),
     {mapred_verifiers:Verifier(entries, Result, length(Inputs)),
