@@ -5,6 +5,8 @@
 
 -define(BUCKET, <<"mr_validate">>).
 -define(PROP(K, L), proplists:get_value(K, L)).
+-define(BINDEX1, <<"bindex1">>).
+-define(BINDEX2, <<"bindex2">>).
 
 main([]) ->
     usage();
@@ -62,17 +64,28 @@ populate_bucket(_Client, _BucketName, _KeySize, 0) ->
 populate_bucket(Client, BucketName, KeySize, EntryNum) ->
     Key = entry_num_to_key(EntryNum),
     Obj = riak_object:new(BucketName, Key, generate_body(KeySize)),
-    LinkObj = add_links(Obj, BucketName, EntryNum),
+    IndexMd = get_indexes(EntryNum),
+    LinkMd = add_links(IndexMd, BucketName, EntryNum),
+    LinkObj = riak_object:update_metadata(Obj, LinkMd),
     ok = Client:put(LinkObj, 0),
     populate_bucket(Client, BucketName, KeySize, EntryNum - 1).
 
-add_links(Obj, BucketName, EntryNum) ->
-    MD0 = riak_object:get_metadata(Obj),
-    MD1 = dict:store(<<"Links">>,
+add_links(MD0, BucketName, EntryNum) ->
+    dict:store(<<"Links">>,
                      [{{BucketName, entry_num_to_key(EntryNum-1)},<<"prev">>},
                       {{BucketName, entry_num_to_key(EntryNum+1)},<<"next">>}],
-                     MD0),
-    riak_object:update_metadata(Obj, MD1).
+            MD0).
+
+get_indexes(EntryNum) ->
+    BinIndex = get_binindex(EntryNum),
+    Indexes = [{"field1_bin", BinIndex},
+               {"field2_int", EntryNum}],
+    dict:store(<<"index">>, Indexes, dict:new()).
+
+get_binindex(EntryNum) when EntryNum rem 2 == 0 ->
+    ?BINDEX1;
+get_binindex(_EntryNum) ->
+    ?BINDEX2.
 
 run_jobs(Client, Bucket, KeyCount, TestFile) ->
     Tests = test_descriptions(TestFile),
@@ -103,7 +116,12 @@ verify_job(Client, Bucket, KeyCount, Label, JobDesc, Verifier) ->
                      {"full bucket mapred", fun verify_bucket_job/5},
                      {"filtered bucket mapred", fun verify_filter_job/5},
                      {"missing object", fun verify_missing_job/5},
-                     {"missing object twice", fun verify_missing_twice_job/5}]
+                     {"missing object twice", fun verify_missing_twice_job/5},
+                     {"2i $bucket index", fun verify_2i_bucket_job/5},
+                     {"2i $key index", fun verify_2i_keys_job/5},
+                     {"2i Eq query", fun verify_2i_eq_job/5},
+                     {"2i Eq int, single value", fun verify_2i_eq_int_job/5},
+                     {"2i range query", fun verify_2i_range_job/5}]
                 end,
     io:format("Running ~p~n", [Label]),
     lists:foldl(
@@ -161,6 +179,63 @@ verify_bucket_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     {mapred_verifiers:Verifier(bucket, Result, KeyCount),
      erlang:round(timer:now_diff(End, Start) / 1000)}.
 
+verify_2i_bucket_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
+    Test = fun() ->
+            Range = {index, Bucket, <<"$bucket">>, Bucket},
+            Start = erlang:now(),
+            {_, Node, _} = Client,
+            {ok, Result} = rpc:call(Node, riak_kv_mrc_pipe, mapred, [Range, JobDesc]),
+            End = erlang:now(),
+            {mapred_verifiers:Verifier(bucket, Result, KeyCount),
+             erlang:round(timer:now_diff(End, Start) / 1000)} end,
+    run_2i_test(Client, Bucket, Test).
+
+verify_2i_keys_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
+    Test = fun() ->
+            KeyStart = entry_num_to_key(1),
+            EndKey = key_range_end(KeyCount),
+            Range = {index, Bucket, <<"$key">>, KeyStart, EndKey},
+            Start = erlang:now(),
+            {_, Node, _} = Client,
+            {ok, Result} = rpc:call(Node, riak_kv_mrc_pipe, mapred, [Range, JobDesc]),
+            End = erlang:now(),
+            {mapred_verifiers:Verifier(bucket, Result, KeyCount div 2),
+             erlang:round(timer:now_diff(End, Start) / 1000)} end,
+    run_2i_test(Client, Bucket, Test).
+
+verify_2i_eq_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
+    Test = fun() ->
+            Eq = {index, Bucket, <<"field1_bin">>, ?BINDEX1},
+            Start = erlang:now(),
+            {_, Node, _} = Client,
+            {ok, Result} = rpc:call(Node, riak_kv_mrc_pipe, mapred, [Eq, JobDesc]),
+            End = erlang:now(),
+            {mapred_verifiers:Verifier(bucket, Result, KeyCount div 2),
+             erlang:round(timer:now_diff(End, Start) / 1000)} end,
+    run_2i_test(Client, Bucket, Test).
+
+verify_2i_eq_int_job(Client, Bucket, _KeyCount, JobDesc, Verifier) ->
+   Test = fun() ->
+            Eq = {index, Bucket, <<"field2_int">>, 1},
+            Start = erlang:now(),
+            {_, Node, _} = Client,
+            {ok, Result} = rpc:call(Node, riak_kv_mrc_pipe, mapred, [Eq, JobDesc]),
+            End = erlang:now(),
+            {mapred_verifiers:Verifier(bucket, Result, 1),
+             erlang:round(timer:now_diff(End, Start) / 1000)} end,
+    run_2i_test(Client, Bucket, Test).
+
+verify_2i_range_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
+    Test = fun() ->
+                   Range = {index, Bucket, <<"field2_int">>, 1, KeyCount div 2},
+                   Start = erlang:now(),
+                   {_, Node, _} = Client,
+                   {ok, Result} = rpc:call(Node, riak_kv_mrc_pipe, mapred, [Range, JobDesc]),
+                   End = erlang:now(),
+                   {mapred_verifiers:Verifier(bucket, Result, KeyCount div 2),
+                    erlang:round(timer:now_diff(End, Start) / 1000)} end,
+    run_2i_test(Client, Bucket, Test).
+
 verify_entries_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     Inputs = select_inputs(Bucket, KeyCount),
     Start = erlang:now(),
@@ -170,8 +245,23 @@ verify_entries_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     {mapred_verifiers:Verifier(entries, Result, length(Inputs)),
      erlang:round(timer:now_diff(End, Start) / 1000)}.
 
+%% 2i test runner
+run_2i_test(Client, Bucket, Test) ->
+    {_, Node, _} = Client,
+    case is_2i_backend(Node, Bucket) of
+        true ->
+            Test();
+        false ->
+            io:format("Skipping, not 2i backend"),
+            {true, 0}
+    end.
+
 entry_num_to_key(EntryNum) ->
     list_to_binary(["mrv", integer_to_list(EntryNum)]).
+
+key_range_end(KeyCount) ->
+    Results = lists:sublist(lists:sort([entry_num_to_key(N) || N <- lists:seq(1, KeyCount)]), 1, KeyCount div 2),
+     hd(lists:reverse(Results)).
 
 select_inputs(Bucket, KeyCount) ->
     [{Bucket, entry_num_to_key(EntryNum)}
@@ -294,3 +384,22 @@ parse_kbinteger(KeySpec) ->
 
 generate_body(Size) ->
     list_to_binary([lists:duplicate(Size-1, $0),"1"]).
+
+%% detecting 2i backends
+is_2i_backend(Node, Bucket) ->
+    Backend = rpc:call(Node, app_helper, get_env, [riak_kv, storage_backend]),
+    is_2i_backend(Backend, Node, Bucket).
+
+is_2i_backend(riak_kv_eleveldb_backend, _Node, _Bucket) ->
+    true;
+is_2i_backend(riak_kv_memory_backend, _Node, _Bucket) ->
+    true;
+is_2i_backend(riak_kv_multibackend, Node, Bucket) ->
+    Multi = rpc:call(Node, app_helper, get_env, [riak_kv, multi_backend]),
+    BucketProps = rpc:call(Node, riak_core_bucket, get_bucket, [Bucket]),
+    DefaultBackend = rpc:call(Node, app_helper, get_env, [riak_kv, multi_backend_default]),
+    BucketBackendName = proplists:get_value(backend, BucketProps, DefaultBackend),
+    {_, BucketBackend, _} = lists:keyfind(BucketBackendName, 1, Multi),
+    is_2i_backend(BucketBackend, Node, Bucket); %% if it loops here, lmao
+is_2i_backend(_, _, _) ->
+    false.
