@@ -159,8 +159,8 @@ Running "Link prev"
     mapred_verify was unable to find the compiled Erlang files that
     implement Riak's native interface.  Check the path you provided in
     the =-c= command line parameter.  The directory you provided
-    should include =deps/riak_core/ebin=, =deps/riak_kv/ebin=, and
-    =deps/luke/ebin=, each containing many =*.beam= files.
+    should include =deps/riak_core/ebin=, and =deps/riak_kv/ebin=,
+    each containing many =*.beam= files.
 
 *** escript: exception error: ... {could_not_reach_node,'...'}
 

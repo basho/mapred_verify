@@ -236,9 +236,7 @@ setup_environment(Args) ->
 setup_code_paths(Path) ->
     CorePath = filename:join([Path, "deps", "riak_core", "ebin"]),
     KVPath = filename:join([Path, "deps", "riak_kv", "ebin"]),
-    LukePath = filename:join([Path, "deps", "luke", "ebin"]),
-    setup_paths([{riak_core, CorePath}, {riak_kv, KVPath},
-                 {luke, LukePath}]).
+    setup_paths([{riak_core, CorePath}, {riak_kv, KVPath}]).
 
 setup_paths([]) ->
     ok;
