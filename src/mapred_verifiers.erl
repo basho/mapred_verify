@@ -1,6 +1,6 @@
 -module(mapred_verifiers).
 
--compile([export_all]).
+-compile([export_all, nowarn_export_all]).
 
 %% @type type() = bucket|entries
 

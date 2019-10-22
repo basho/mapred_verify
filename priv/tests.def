@@ -6,83 +6,10 @@
    {reduce,{modfun, riak_kv_mapreduce, reduce_sum},              none,true}],
   simple}}.
 
-{"JS/JS",
- {[{map,    {jsfun, <<"Riak.mapValuesJson">>}, none, false},
-   {reduce, {jsfun, <<"Riak.reduceSum">>},     none, true}],
-  simple}}.
-
-{"JS/Erlang",
- {[{map,    {jsfun, <<"Riak.mapValuesJson">>},       none, false},
-   {reduce, {modfun, riak_kv_mapreduce, reduce_sum}, none, true}],
-  simple}}.
-
-{"Erlang/JS",
- {[{map,    {modfun, riak_kv_mapreduce, map_object_value},
-    <<"filter_notfound">>, false},
-   {reduce, {jsfun, <<"Riak.reduceSort">>},                none, true}],
-  sorted}}.
-
-{"JS/Erlang/JS",
- {[{map,    {jsfun, <<"Riak.mapValuesJson">>},        none, false},
-   {reduce, {modfun, riak_kv_mapreduce, reduce_sort}, none, false},
-   {reduce, {jsfun, <<"Riak.reduceSum">>},            none, true}],
-  simple}}.
-
-{"Erlang/JS/Erlang",
- {[{map, {modfun, riak_kv_mapreduce, map_object_value},
-    <<"filter_notfound">>, false},
-   {reduce, {jsanon,
-             <<"function(v) {
-                values = Riak.filterNotFound(v);
-                return values.map(
-                  function(value) {
-                    if (typeof value === 'string') {
-                      return JSON.parse(value);
-                    } else {
-                      return value;
-                    }
-                  });}">>},
-                                                        none, false},
-   {reduce, {modfun, riak_kv_mapreduce, reduce_sum},    none, true}],
-  simple}}.
-
-{"Erlang/JS/JS",
- {[{map, {modfun, riak_kv_mapreduce, map_object_value},
-    <<"filter_notfound">>, false},
-   {reduce, {jsanon,
-             <<"function(v) {
-                values = Riak.filterNotFound(v);
-                return values.map(
-                  function(value) {
-                    if (typeof value === 'string') {
-                      return JSON.parse(value);
-                    } else {
-                      return value;
-                    }
-                  });}">>},
-                                                        none, false},
-   {reduce, {jsfun, <<"Riak.reduceSum">>},              none, true}],
-  simple}}.
 
 {"Erlang map",
  {[{map, {modfun, riak_kv_mapreduce, map_object_value},
     <<"include_notfound">>, true}],
-  map}}.
-
-{"JS map",
- {[{map, {jsfun, <<"Riak.mapValuesJson">>}, none, true}],
-  map}}.
-
-{"Erlang/JS Link prev", %% Do not remove "Link" from this name!
- {[{link, '_', <<"prev">>,               false},
-   {map, {jsanon,
-          <<"function(v,d) {
-                if (d == 'prev')
-                   return [v.key];
-                else
-                   return [];
-             }">>},
-                                   none, true}],
   map}}.
 
 {"Erlang/Erlang link prev",

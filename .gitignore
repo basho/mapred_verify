@@ -1,4 +1,5 @@
 ebin/*
 mapred_verify
 *~
-
+_build/*
+.DS_Store
