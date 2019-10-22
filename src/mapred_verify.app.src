@@ -1,6 +1,6 @@
 {application, mapred_verify,
  [
-  {description, ""},
+  {description, "Map Reduce tests (now Erlang only)"},
   {vsn, "1"},
   {registered, []},
   {applications, [
