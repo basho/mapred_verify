@@ -49,7 +49,7 @@ clear_bucket(_Client, _BucketName, 0) ->
     ok;
 clear_bucket(Client, BucketName, EntryNum) ->
     Key = entry_num_to_key(EntryNum),
-    case Client:delete(BucketName, Key, 1) of
+    case riak_client:delete(BucketName, Key, 1, Client) of
         R when R =:= ok orelse R =:= {error, notfound} ->
             clear_bucket(Client, BucketName, EntryNum - 1);
         Error ->
@@ -62,7 +62,7 @@ populate_bucket(Client, BucketName, KeySize, EntryNum) ->
     Key = entry_num_to_key(EntryNum),
     Obj = riak_object:new(BucketName, Key, generate_body(KeySize)),
     LinkObj = add_links(Obj, BucketName, EntryNum),
-    ok = Client:put(LinkObj, 0),
+    ok = riak_client:put(LinkObj, 0, Client),
     populate_bucket(Client, BucketName, KeySize, EntryNum - 1).
 
 add_links(Obj, BucketName, EntryNum) ->
